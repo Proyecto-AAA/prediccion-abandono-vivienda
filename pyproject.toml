@@ -1,0 +1,11 @@
+[project]
+name = "prediccion-abandono-vivienda"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "jupyter>=1.1.1",
+    "pandas>=3.0.1",
+    "scikit-learn>=1.8.0",
+]
