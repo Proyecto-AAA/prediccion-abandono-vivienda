@@ -2,7 +2,7 @@
   <img src="miscellaneous/mcd.png" alt="Logo de la Maestría" width="150"/>
 </p>
 
-# El Espejismo Inmobiliario: Predicción de Abandono de Vivienda y Plusvalía Atípica en Hermosillo
+# El Espejismo Inmobiliario: Predicción de Abandono de Vivienda y Plusvalía Atípica en Sonora
 
 <p align="center">
     <a href="https://www.python.org/downloads/release/python-3110/">
@@ -21,123 +21,187 @@
 
 ---
 
-## 1. Justificación del Proyecto (Etapa 1)
-
-Este proyecto busca alinear los objetivos analíticos con las necesidades de desarrollo social y urbano de Hermosillo. A continuación, se detallan los puntos clave del diseño:
+## El Problema
 
 ### ¿Qué problema se plantea resolver?
 
-Buscamos predecir, con base en datos históricos y censales, qué zonas de Hermosillo están en alto riesgo de sufrir un abandono masivo de viviendas particulares (deterioro urbano), y en contraparte, identificar zonas con un crecimiento de plusvalía atípico o especulativo (gentrificación). Queremos anticipar dónde se va a deteriorar la ciudad y dónde se está volviendo impagable.
+En las seis ciudades más grandes de Sonora —Hermosillo, Cajeme, Nogales, Navojoa, Guaymas y San Luis Río Colorado— existe un fenómeno que se ve a simple vista en cualquier colonia: casas con candado, con las ventanas tapadas con tablas, fraccionamientos enteros donde la mitad de las viviendas están cerradas y nadie vive ahí. Al mismo tiempo, a unos kilómetros, otras zonas se llenan de desarrollos nuevos, precios de renta que se duplican y negocios que desplazan a los vecinos originales.
+
+**Este proyecto busca predecir, antes de que ocurra, cuáles colonias están en camino de convertirse en zonas de abandono masivo y cuáles están experimentando una especulación inmobiliaria que las hace inaccesibles para la población que históricamente las habitó.** Queremos anticipar dónde se va a deteriorar la ciudad y dónde se está volviendo impagable — con datos, no con intuición.
+
+La unidad de análisis es el **AGEB** (Área Geoestadística Básica), que corresponde aproximadamente a una colonia o fracción de colonia. Se analizan **1,817 AGEBs** urbanos en los seis municipios.
 
 ### ¿Por qué es un problema importante?
 
-Hermosillo crece de forma desigual. Mientras el Blvd. Morelos concentra desarrollos verticales de alta plusvalía, periferias como Pueblitos o La Cholla concentran viviendas abandonadas. Esto es crítico para:
+El abandono de vivienda no es solo un problema estético. Tiene consecuencias en cadena que afectan a múltiples actores:
 
-- **Ayuntamiento/CIDUE:** Planear servicios públicos, pavimentación y seguridad en zonas vulnerables.
-- **Infonavit:** Gestionar la cartera vencida y prevenir la pérdida de valor de las garantías.
-- **Ciudadanía:** Tomar decisiones informadas sobre inversión patrimonial.
+- **Para las familias:** Una vivienda abandonada en la misma calle devalúa el patrimonio de los vecinos, aumenta la inseguridad y degrada los servicios comunes del fraccionamiento.
+- **Para el gobierno municipal:** Las zonas abandonadas siguen requiriendo servicios públicos (alumbrado, recolección de basura, seguridad) pero dejan de generar ingresos fiscales prediales. Además, la densificación de servicios en zonas de plusvalía y el descuido de las periféricas profundiza la desigualdad urbana.
+- **Para las instituciones de vivienda (Infonavit, Fovissste):** Cuando una vivienda financiada queda abandonada, el crédito entra en cartera vencida y la garantía hipotecaria pierde valor. Identificar el riesgo a tiempo permite intervenir antes de que el daño sea irreversible.
+- **Para la planificación urbana:** México construyó millones de viviendas de interés social entre 2000 y 2015 en la periferia de las ciudades. Muchas de ellas hoy están deshabitadas porque quedaron lejos de empleos, escuelas y transporte. Saber qué factores predicen el abandono ayuda a diseñar mejor la política de vivienda futura.
+
+En términos prácticos, este modelo puede ayudar a priorizar inspecciones, dirigir subsidios de rehabilitación, identificar zonas de riesgo para nuevos créditos hipotecarios y orientar la planeación del uso del suelo.
 
 ### ¿Qué problema de aprendizaje implica resolver?
 
-Se plantea como un problema de **Aprendizaje Automático Supervisado** de tipo **Clasificación Binaria**.
+Se plantea como un problema de **clasificación binaria supervisada**.
 
-- **Unidad de análisis:** Colonia o Área Geoestadística Básica (AGEB).
-- **Clases:**
-  - **Clase 1 (Sí):** La colonia tiene ALTO riesgo de abandono masivo/especulación.
-  - **Clase 0 (No):** La colonia se mantendrá estable.
+- **Variable objetivo:** `abandono_alto` — indica si un AGEB supera el percentil 75 de tasa de abandono (`VIVPAR_DES / VIVTOT > p75`).
+- **Clase 1 — Alto riesgo:** El AGEB tiene una tasa de desocupación de viviendas por encima del umbral crítico (~16%). Son las zonas que requieren atención prioritaria.
+- **Clase 0 — Zona estable:** El AGEB presenta niveles de abandono dentro del rango normal para su contexto urbano.
+
+El umbral en el percentil 75 fue elegido en consenso con el criterio de experto: concentra el 25% de los AGEBs con mayor problemática, que es el segmento accionable para una intervención de política pública.
+
+Las **variables predictoras** provienen de tres fuentes complementarias:
+
+| Bloque | Variables | Fuente |
+|---|---|---|
+| Rezago habitacional | Piso de tierra, sin drenaje, sin bienes, letrina, hacinamiento, `SCORE_REZAGO` | Censo INEGI 2020 |
+| Bienestar socioeconómico | Escolaridad promedio, internet, automóvil | Censo INEGI 2020 |
+| Marginación | Índice de Marginación 2020 (`IM_2020`) | CONAPO 2020 |
+| Actividad económica | Bancos, cafeterías, inmobiliarias por AGEB | DENUE 2020 |
 
 ### ¿Qué métricas permiten medir la calidad del modelo?
 
-Dado el impacto social, es prioritario minimizar los falsos negativos en la detección de zonas de riesgo:
+Dado el impacto social del problema, **los errores no tienen el mismo costo**. Clasificar como "zona estable" un AGEB que en realidad está en riesgo (falso negativo) tiene consecuencias mucho más graves que generar una alerta innecesaria sobre una zona que resulta estar bien (falso positivo): en el primer caso se pierde la oportunidad de intervención; en el segundo, solo se invierte tiempo en una revisión adicional.
 
-1.  **Recall (Sensibilidad):** Para capturar la mayor cantidad de zonas en riesgo real (Valor deseable: > 0.85).
-2.  **F1-Score:** Para mantener un equilibrio y optimizar la asignación de recursos públicos (Valor deseable: > 0.80).
-3.  **AUC-ROC:** Para medir la capacidad del modelo de discriminar entre clases (Valor deseable: > 0.85).
+Por esta razón, las métricas se definen con la siguiente jerarquía:
+
+| Métrica | Descripción | Valor deseable | Justificación |
+|---|---|---|---|
+| **Recall (Sensibilidad)** | Proporción de zonas en riesgo real que el modelo detecta | **> 0.85** | Minimizar los falsos negativos — no dejar zonas en riesgo sin detectar |
+| **F1-Score** | Media armónica de precisión y recall | **> 0.80** | Equilibrio entre detectar bien y no generar demasiadas falsas alarmas |
+| **AUC-ROC** | Capacidad del modelo de separar las dos clases | **> 0.85** | Mide la calidad discriminativa global del modelo en todos los umbrales posibles |
+
+Se monitoreará también la **matriz de confusión** por municipio para detectar si el modelo funciona mejor en unas ciudades que en otras, ya que la dinámica de abandono en Hermosillo no es la misma que en Navojoa o en las ciudades fronterizas.
 
 ### ¿Cómo están alineadas las métricas con los objetivos?
 
-Un alto **Recall** asegura que las instituciones intervengan oportunamente en focos rojos, alineándose con la prevención del deterioro urbano. Un buen **F1-Score** garantiza que los recursos públicos se asignen de manera eficiente y justa, evitando falsas alarmas.
+La alineación entre las métricas del modelo y los objetivos de las organizaciones involucradas es directa:
+
+- **Recall alto → intervención oportuna:** Para el gobierno municipal y las instituciones de vivienda, lo más valioso es que el modelo no deje pasar ninguna zona en riesgo real. Un Recall > 0.85 significa que de cada 100 AGEBs que realmente están en camino al abandono, el modelo identifica correctamente al menos 85. Eso son 85 oportunidades de intervención que sin el modelo quedarían invisibles.
+
+- **F1-Score alto → uso eficiente de recursos públicos:** Los recursos para inspección y rehabilitación son limitados. Un buen F1-Score garantiza que las alertas del modelo se dirijan a zonas genuinamente problemáticas, sin desperdiciar capacidad operativa en falsas alarmas. Un F1 > 0.80 indica que la lista de "zonas prioritarias" generada por el modelo es confiable.
+
+- **AUC-ROC alto → flexibilidad para distintos umbrales de decisión:** Distintas instituciones pueden tener distintas tolerancias al riesgo. Un AUC > 0.85 significa que el modelo se puede ajustar (cambiando el umbral de clasificación) para ser más conservador (alertar ante menos evidencia) o más estricto, según la capacidad de respuesta de cada organización en cada momento.
+
+En resumen: **el modelo no reemplaza la decisión humana, la informa**. La salida del modelo es una lista priorizada de AGEBs que merece la atención de planificadores, inspectores de vivienda y gestores de cartera hipotecaria — permitiéndoles actuar antes de que el problema sea irreversible.
 
 ---
 
-## 2. Fuentes de Datos
+## Fuentes de Datos
 
-- **INEGI (Censo 2020):** Datos a nivel AGEB sobre viviendas deshabitadas, servicios básicos y rezago social.
-- **INFONAVIT (Datos Abiertos):** Histórico de créditos otorgados y tasa de cartera vencida por código postal.
-- **Catastro Municipal / DENUE:** Histórico de valores catastrales y concentración de unidades económicas (proxy de plusvalía).
+| Fuente | Descripción | Archivo |
+|---|---|---|
+| **Censo INEGI 2020** | Indicadores de vivienda y rezago social a nivel AGEB para los 6 municipios (1,817 AGEBs) | `data/raw/censo__inegi_2020.csv` |
+| **DENUE 2020** | Directorio de unidades económicas — proxy de actividad comercial y de plusvalía por AGEB | `data/raw/denue_sonora_2020.csv` |
+| **CONAPO 2020** | Índice de Marginación a nivel AGEB para Sonora | `data/raw/conapo_2020.xlsx` |
+| **Marco Geoestadístico** | Fronteras de municipios de Sonora para mapas interactivos | `data/mapas/Mapa.json` |
 
-_Nota: Los diccionarios de datos crudos se encuentran en el directorio `references/`._
+> Los diccionarios de variables están en `references/`. El archivo `references/diccionario_ageb_features.md` documenta las 34 variables del dataset procesado.
+
+**Nota sobre limitaciones de los datos:** El Censo INEGI 2020 puede subestimar el rezago en asentamientos irregulares e invasiones que no fueron censados correctamente. Los indicadores de actividad económica informal (empeños, artículos usados) no aparecen en el DENUE porque operan fuera del registro formal. Se está a la espera de **datos catastrales del gobierno del estado de Sonora**, que permitirán medir plusvalía habitacional de forma directa y mejorar significativamente el poder predictivo del modelo.
 
 ---
 
-## 3. Estructura del Proyecto
+## Estructura del Proyecto
 
 ```text
-├── README.md               <- Descripción general y justificación de negocio.
-├── miscellaneous/          <- Recursos visuales y logos.
+prediccion-abandono-vivienda/
+├── README.md                        <- Este archivo
+├── CLAUDE.md                        <- Instrucciones para el asistente de IA
+├── miscellaneous/                   <- Recursos visuales y logos
 ├── data/
-│   ├── raw/                <- Datos originales e inmutables.
-│   └── processed/          <- Datos limpios listos para modelado.
-├── notebooks/              <- Jupyter Notebooks (EDA y aprendizaje no supervisado).
-├── references/             <- Diccionarios de datos y manuales.
-├── src/                    <- Código fuente de Python.
+│   ├── raw/                         <- Datos originales e inmutables
+│   ├── interim/                     <- Datos limpios post-ETL (pre-features)
+│   ├── processed/                   <- Dataset final listo para modelado
+│   └── mapas/                       <- GeoJSON y shapefiles para mapas
+├── notebooks/
+│   ├── 0_seleccion_variables.ipynb  <- Exploración inicial y selección de features
+│   ├── 1.0_EDA.ipynb                <- Análisis exploratorio completo (Censo, CONAPO, DENUE)
+│   └── 2.0_Mapas.ipynb              <- Mapas interactivos con Folium por ciudad
+├── references/
+│   ├── diccionario_ageb_features.md <- Diccionario de las 34 variables del dataset
+│   ├── diccionario_ageb_features.csv
+│   └── diccionario_denue.csv
+├── reports/
+│   ├── figures/                     <- Gráficas generadas por el EDA
+│   └── maps/                        <- Mapas HTML interactivos por ciudad
+├── src/
 │   ├── data/
-│   │   └── make_dataset.py <- Scripts ETL para procesar datos crudos.
+│   │   └── make_dataset.py          <- ETL raw → interim (Censo + DENUE + CONAPO)
 │   └── features/
-│       └── build_features.py <- Ingeniería de características.
-├── pyproject.toml          <- Configuración de uv y dependencias.
-└── uv.lock                 <- Archivo de bloqueo para reproducibilidad.
+│       └── build_features.py        <- ETL interim → processed (features + target)
+├── pyproject.toml                   <- Configuración de uv y dependencias
+└── uv.lock                          <- Bloqueo de versiones para reproducibilidad
 ```
 
 ---
 
-## 4. Flujo de Trabajo (Etapa 1)
+## Flujo de Trabajo
 
-Para esta primera etapa, el equipo seguirá este orden de trabajo en los notebooks:
+```
+data/raw/                     data/interim/            data/processed/
+censo__inegi_2020.csv  ──┐                             ageb_features.csv
+denue_sonora_2020.csv  ──┤── make_dataset.py ──────── build_features.py ──── notebooks/
+conapo_2020.xlsx       ──┘   (ETL raw→interim)        (ETL interim→proc.)    modelado
+```
 
-1.  **Adquisición de Datos Crudos:** Descarga manual de portales abiertos y colocación en `data/raw/`.
-2.  **ETL (`src/data/make_dataset.py`):** Limpieza, manejo de nulos y unión de datos de INEGI e Infonavit.
-3.  **Análisis Exploratorio (`notebooks/`):**
-    - Uso de estadísticas descriptivas y visualizaciones.
-    - Aplicación de **al menos dos métodos de aprendizaje no supervisado** (ej. Clustering con K-Means para agrupar AGEBs por rezago, y PCA para reducción de dimensionalidad de servicios) para extraer _insights_ profundos antes del modelado predictivo.
+1. **ETL Stage 1** — `src/data/make_dataset.py`: limpia el Censo, agrega el DENUE por AGEB y produce `data/interim/ageb_clean.csv`
+2. **ETL Stage 2** — `src/features/build_features.py`: calcula tasas de rezago, score compuesto, variable objetivo y target binario; produce `data/processed/ageb_features.csv`
+3. **EDA** — `notebooks/1.0_EDA.ipynb`: análisis exploratorio por fuente de datos con PCA y K-Means
+4. **Mapas** — `notebooks/2.0_Mapas.ipynb`: mapas interactivos de Sonora y las 6 ciudades con capas de abandono, rezago, CONAPO y DENUE
+
+Para ejecutar el pipeline ETL completo:
+
+```bash
+uv run python src/data/make_dataset.py
+uv run python src/features/build_features.py
+```
 
 ---
 
-## 5. Instalación y Configuración (Get Started)
+## Instalación y Configuración
 
-Este proyecto utiliza **uv** para la gestión ágil de dependencias y entornos virtuales.
+Este proyecto utiliza **uv** para la gestión de dependencias y entornos virtuales.
 
 ### Requisitos Previos
 
-Tener instalado **uv** (Python package manager). Si aún no lo tienes, puedes instalarlo en Mac/Linux con:
+Instalar **uv** (si no está disponible):
 
 ```bash
-curl -LsSf [https://astral.sh/uv/install.sh](https://astral.sh/uv/install.sh) | sh
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 ### Configuración del Entorno Local
 
-1.  **Clonar el Repositorio:**
+1. **Clonar el repositorio:**
 
     ```bash
     git clone git@github.com:Proyecto-AAA/prediccion-abandono-vivienda.git
     cd prediccion-abandono-vivienda
     ```
 
-2.  **Sincronizar el Entorno con uv:**
-    Este comando leerá el archivo `pyproject.toml`, descargará la versión correcta de Python (si es necesario), creará el entorno virtual (`.venv`) e instalará las dependencias exactas definidas en el proyecto en cuestión de segundos.
+2. **Sincronizar el entorno con uv** — descarga Python 3.11, crea `.venv` e instala todas las dependencias exactas:
 
     ```bash
     uv sync
     ```
 
-3.  **Activar el Entorno:**
+3. **Lanzar Jupyter:**
+
     ```bash
-    source .venv/bin/activate
+    uv run jupyter notebook
     ```
+
+### Agregar dependencias
+
+```bash
+uv add <paquete>
+```
 
 ---
 
 ## Contacto
 
-¿Tienes dudas o sugerencias sobre el proyecto? Abre un _Issue_ en el repositorio o contáctanos directamente a nuestros correos.
+¿Tienes dudas o sugerencias sobre el proyecto? Abre un _Issue_ en el repositorio o contáctanos directamente a nuestros correos institucionales.
