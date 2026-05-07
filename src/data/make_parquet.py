@@ -11,6 +11,7 @@ from sklearn.impute import SimpleImputer
 
 RAW_CSV = Path("data/processed/ageb_features.csv")
 OUTPUT_PARQUET = Path("data/processed/train_ready.parquet")
+OUTPUT_CSV = Path("data/processed/train_ready.csv")
 
 FEATURES = [
     # Rezago habitacional (tasas normalizadas)
@@ -65,7 +66,9 @@ def make_parquet():
     out.index = hmo["CVE_AGEB"].values
 
     out.to_parquet(OUTPUT_PARQUET)
+    out.to_csv(OUTPUT_CSV)
     print(f"\nGuardado en: {OUTPUT_PARQUET}")
+    print(f"Guardado en: {OUTPUT_CSV}")
     print(f"Shape final: {out.shape}")
 
 
