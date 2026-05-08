@@ -14,6 +14,7 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import recall_score, f1_score, roc_auc_score
 
 PARQUET_PATH = Path("data/processed/train_ready.parquet")
+PARQUET_PATH_CATASTRO = Path("data/processed/train_catastro.parquet")
 
 FEATURES = [
     "TASA_PISO_TIERRA", "TASA_SIN_DRENAJE", "TASA_SIN_ELEC",
@@ -24,6 +25,8 @@ FEATURES = [
     "n_bancos", "n_cafes", "n_inmobiliarias",
     "n_empenos", "n_usados", "n_yonques",
 ]
+
+FEATURES_CATASTRO = FEATURES + ["VALOR_CATASTRAL_MAX"]
 
 TARGET = "abandono_alto"
 
@@ -37,6 +40,14 @@ def cargar_datos():
     """Carga el parquet de Hermosillo y devuelve X, y listos para modelar."""
     df = pd.read_parquet(PARQUET_PATH)
     X = df[FEATURES]
+    y = df[TARGET]
+    return X, y
+
+
+def cargar_datos_catastro():
+    """Carga el parquet con feature catastral (VALOR_CATASTRAL_MAX) y devuelve X, y."""
+    df = pd.read_parquet(PARQUET_PATH_CATASTRO)
+    X = df[FEATURES_CATASTRO]
     y = df[TARGET]
     return X, y
 
